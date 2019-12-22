@@ -79,9 +79,7 @@ export class client {
 
     public connected: boolean = false;
 
-    constructor(options: {
-        id: string;
-    }) {
+    constructor(id: string) {
         const t = Date.now(),
             connect = () => {
                 if (this.ipcClient) this.ipcClient.destroy();
@@ -92,7 +90,7 @@ export class client {
                 }
                 let previousData = '';
 
-                this.ipcClient = net.createConnection('\\\\?\\pipe\\' + options.id, () => {
+                this.ipcClient = net.createConnection('\\\\?\\pipe\\' + id, () => {
                     this.connected = true;
                 }).on('error', (err) => {
                     if (Date.now() - t > 2000) throw err;
@@ -123,6 +121,7 @@ export class client {
             }
         connect();
     }
+
     send(type: string, req: (string | number)[], res?: response) {
         if (!this.connected) return setTimeout(() => this.send(type, req, res), 1000);
         let id: string;

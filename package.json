@@ -1,0 +1,33 @@
+{
+  "name": "fast-ipc",
+  "version": "1.0.1",
+  "description": "Fast & simple IPC (Inter-Process Communication) server/client written on native net module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scrwdrv/fast-ipc.git"
+  },
+  "keywords": [
+    "ipc",
+    "net",
+    "fast",
+    "lightweight",
+    "socket"
+  ],
+  "author": "scrwdrv",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/scrwdrv/fast-ipc/issues"
+  },
+  "homepage": "https://github.com/scrwdrv/fast-ipc#readme",
+  "devDependencies": {
+    "@types/node": "^12.12.21"
+  },
+  "dependencies": {
+    "fast-safe-stringify": "^2.0.7",
+    "fast-unique-id": "^1.0.6"
+  }
+}
