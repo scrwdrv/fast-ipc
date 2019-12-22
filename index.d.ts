@@ -3,7 +3,7 @@ declare type response = (err: any, result?: any) => void;
 export declare class server {
     private eventListeners;
     constructor(id: string);
-    on(event: string, handler: requestHandler): void;
+    on(event: string, handler: requestHandler): this;
 }
 export declare class client {
     private ipcClient;

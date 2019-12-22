@@ -59,6 +59,7 @@ class server {
     }
     on(event, handler) {
         this.eventListeners[event] = handler;
+        return this;
     }
 }
 exports.server = server;

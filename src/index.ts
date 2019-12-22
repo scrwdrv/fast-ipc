@@ -68,6 +68,7 @@ export class server {
 
     on(event: string, handler: requestHandler) {
         this.eventListeners[event] = handler;
+        return this;
     }
 }
 
