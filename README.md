@@ -1,5 +1,5 @@
 # fast-ipc
-Fast & simple IPC (Inter-Process Communication) server/client written on native net module
+Fast & simple IPC (Inter-Process Communication) server/client build on native net module
 
 ## Installation
 
