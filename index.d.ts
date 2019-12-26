@@ -1,4 +1,4 @@
-declare type requestHandler = (req: (string | number)[], res?: response) => void;
+declare type requestHandler = (req: string[], res?: response) => void;
 declare type response = (err: any, result?: any) => void;
 export declare class server {
     private eventListeners;

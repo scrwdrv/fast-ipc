@@ -2,7 +2,7 @@ import * as net from 'net';
 import { fast as uuid } from 'fast-unique-id';
 import safeStringify from 'fast-safe-stringify';
 
-type requestHandler = (req: (string | number)[], res?: response) => void;
+type requestHandler = (req: string[], res?: response) => void;
 type response = (err: any, result?: any) => void;
 
 export class server {
