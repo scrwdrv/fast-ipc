@@ -1,6 +1,6 @@
 {
   "name": "fast-ipc",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Fast & simple IPC (Inter-Process Communication) server/client written on native net module",
   "main": "index.js",
   "scripts": {
