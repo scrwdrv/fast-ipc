@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const net = require("net");
 const fast_unique_id_1 = require("fast-unique-id");
-const fast_safe_stringify_1 = require("fast-safe-stringify");
 class server {
     constructor(id) {
         this.eventListeners = {};
@@ -14,7 +13,7 @@ class server {
                         return;
                     this.eventListeners[stringArray[0]](stringArray.slice(1), res ? (err, result) => {
                         if (socket.writable)
-                            socket.write(fast_safe_stringify_1.default({
+                            socket.write(JSON.stringify({
                                 i: data.slice(0, 18),
                                 e: err,
                                 r: result
