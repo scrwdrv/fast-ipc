@@ -76,6 +76,7 @@ export class client {
     private resMap: {
         [id: string]: response
     } = {};
+    private backlogs: [string, (string | number)[], response][] = [];
 
     public connected: boolean = false;
 
@@ -92,11 +93,14 @@ export class client {
 
                 this.ipcClient = net.createConnection('\\\\?\\pipe\\' + id, () => {
                     this.connected = true;
+                    const l = this.backlogs.length;
+                    if (l) for (let i = l; i--;)
+                        this.send(...this.backlogs.pop());
                 }).on('error', (err) => {
                     if (Date.now() - t > 2000) throw err;
                 }).on('close', () => {
                     this.connected = false;
-                    setTimeout(connect, 1000);
+                    connect();
                 }).on('data', parseChunk)
                     .setEncoding('utf8');
 
@@ -123,7 +127,7 @@ export class client {
     }
 
     send(type: string, req: (string | number)[], res?: response) {
-        if (!this.connected) return setTimeout(() => this.send(type, req, res), 1000);
+        if (!this.connected) return this.backlogs.push([type, req, res]);
         let id: string;
         if (res) {
             id = uuid();

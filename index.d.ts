@@ -8,8 +8,9 @@ export declare class server {
 export declare class client {
     private ipcClient;
     private resMap;
+    private backlogs;
     connected: boolean;
     constructor(id: string);
-    send(type: string, req: (string | number)[], res?: response): any;
+    send(type: string, req: (string | number)[], res?: response): number;
 }
 export {};

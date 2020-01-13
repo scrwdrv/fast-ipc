@@ -65,6 +65,7 @@ exports.server = server;
 class client {
     constructor(id) {
         this.resMap = {};
+        this.backlogs = [];
         this.connected = false;
         const t = Date.now(), connect = () => {
             if (this.ipcClient)
@@ -76,12 +77,16 @@ class client {
             let previousData = '';
             this.ipcClient = net.createConnection('\\\\?\\pipe\\' + id, () => {
                 this.connected = true;
+                const l = this.backlogs.length;
+                if (l)
+                    for (let i = l; i--;)
+                        this.send(...this.backlogs.pop());
             }).on('error', (err) => {
                 if (Date.now() - t > 2000)
                     throw err;
             }).on('close', () => {
                 this.connected = false;
-                setTimeout(connect, 1000);
+                connect();
             }).on('data', parseChunk)
                 .setEncoding('utf8');
             function parseChunk(data) {
@@ -106,7 +111,7 @@ class client {
     }
     send(type, req, res) {
         if (!this.connected)
-            return setTimeout(() => this.send(type, req, res), 1000);
+            return this.backlogs.push([type, req, res]);
         let id;
         if (res) {
             id = fast_unique_id_1.fast();
