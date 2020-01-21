@@ -1,5 +1,6 @@
 import * as net from 'net';
 import { fast as uuid } from 'fast-unique-id';
+import * as fs from 'fs';
 
 type requestHandler = (req: string[], res?: response) => void;
 type response = (err: any, result?: any) => void;
@@ -10,6 +11,8 @@ export class server {
     } = {};
 
     constructor(id: string) {
+        try { fs.unlinkSync('\\\\?\\pipe\\' + id) } catch (err) { }
+
         const createServer = () => {
             const ipcServer = net.createServer((socket: net.Socket) => {
                 const parse = (data: string) => {

@@ -2,9 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const net = require("net");
 const fast_unique_id_1 = require("fast-unique-id");
+const fs = require("fs");
 class server {
     constructor(id) {
         this.eventListeners = {};
+        try {
+            fs.unlinkSync('\\\\?\\pipe\\' + id);
+        }
+        catch (err) { }
         const createServer = () => {
             const ipcServer = net.createServer((socket) => {
                 const parse = (data) => {
