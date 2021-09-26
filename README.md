@@ -1,51 +1,59 @@
-# fast-ipc
+# @lzptec/fast-ipc
 Fast & simple IPC (Inter-Process Communication) server/client build on native net module
 
 ## Installation
 
+npm
 ```sh
-npm i fast-ipc
+npm i @lzptec/fast-ipc
+```
+
+pnpm
+```sh
+pnpm i @lzptec/fast-ipc
 ```
 
 ## Usage
 
 ### Server
 ```js
-import { server } from 'fast-ipc';
+import { server } from '@lzptec/fast-ipc';
 
 const ipcServer =
     new server('example')
-        .on('msg', (req) => {
-            console.log(req);
-            //[1, 2, 3, 4, 5]
+        .on('msg', (data) => {
+            console.log(data);
+            // [1, 2, 3, 4, 5]
         })
-        .on('ping', (req, res) => {
-            res('pong!');
+        .on('ping', () => {
+            return 'pong!';
         })
-        .on('event', (req, res) => {
-            res({
-                data: req,
+        .on('event', (data) => {
+            return {
+                data: data,
                 timestamp: Date.now()
-            });
+            };
         });
 
 ```
 
 ### Client
 ```js
-import { client } from 'fast-ipc';
+import { client } from '@lzptec/fast-ipc';
 
 const ipcClinet = new client('example');
 
 ipcClinet.send('msg', [1, 2, 3, 4, 5]);
 
-ipcClinet.send('ping', [], (msg) => {
-    console.log(msg);
-    //pong!
-});
+const msg = await ipcClinet.send('ping', null);
+console.log(msg); 
+// pong!
 
-ipcClinet.send('event', [1, 2, 3, 'testing'], (msg) => {
-    console.log(msg);
-    //{ data: [ '1', '2', '3', 'testing' ], timestamp: 1577025604487 }
-});
+const event = await ipcClinet.send('event', [1, 2, 3, 'testing']);
+
+console.log(event);
+// { data: [ '1', '2', '3', 'testing' ], timestamp: 1577025604487 }
 ```
+
+## Original
+The original project([fast-ipc](https://github.com/scrwdrv/fast-ipc)) hasn't been updated in the last 2 years, so I created this fork and updated the library 
