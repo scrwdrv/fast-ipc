@@ -1,17 +1,19 @@
 {
     "compilerOptions": {
-        "target": "esnext",
+        "target": "ES2019",
         "module": "commonjs",
         "moduleResolution": "node",
+        "strict": true,
         "alwaysStrict": true,
         "declaration": true,
+        "importHelpers": true,
         "lib": [
-            "esnext"
+            "ES2019"
         ],
-        "outDir": "./"
+        "outDir": "./dist"
     },
-    "include": [
-        "./src"
+    "files": [
+        "./src/index.ts"
     ],
     "typeRoots": [
         "./node_modules/@types"

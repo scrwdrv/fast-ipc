@@ -1,143 +1,223 @@
-import * as net from 'net';
 import { fast as uuid } from 'fast-unique-id';
 import * as fs from 'fs';
+import * as net from 'net';
 
-type requestHandler = (req: string[], res?: response) => void;
-type response = (err: any, result?: any) => void;
+type RequestHandler = (data: any) => any | Promise<any>;
+type PromiseHandler = { resolve: (res: any) => void, reject: (err: any) => void };
+
+export interface serverConfig {
+    onError?: (err: unknown) => void;
+    onClose?: () => void;
+}
+
+export interface clientConfig {
+    onError?: (err: unknown) => void;
+    timeout?: number;
+}
 
 export class server {
-    private eventListeners: {
-        [event: string]: requestHandler;
-    } = {};
+    #eventListeners: { [event: string]: RequestHandler; } = {};
+    #config?: serverConfig;
 
-    constructor(id: string) {
-        try { fs.unlinkSync('\\\\?\\pipe\\' + id) } catch (err) { }
-
-        const createServer = () => {
-            const ipcServer = net.createServer((socket: net.Socket) => {
-                const parse = (data: string) => {
-                    const res = data[0] !== '⚐',
-                        stringArray = data.slice(res ? 18 : 1).split('⚑');
-                    if (!this.eventListeners[stringArray[0]]) return;
-                    this.eventListeners[stringArray[0]](stringArray.slice(1), res ? (err: any, result: any) => {
-                        if (socket.writable) socket.write(JSON.stringify({
-                            i: data.slice(0, 18),
-                            e: err,
-                            r: result
-                        }) + '⚑');
-                    } : undefined);
-                }
-                let previousData = '';
-
-                socket
-                    .on('data', parseChunk)
-                    .on('error', (err) => {
-                        throw err;
-                    }).on('close', () => {
-                        socket.removeAllListeners();
-                        socket.destroy();
-                    }).setEncoding('utf8');
-
-                function parseChunk(data: string) {
-                    let lastIndex = -2,
-                        indexes = [];
-
-                    while (lastIndex !== -1)
-                        lastIndex = data.indexOf('\f', lastIndex !== -2 ? lastIndex + 1 : 0), indexes.push(lastIndex)
-
-                    const separatorsCount = indexes.length - 1;
-
-                    if (separatorsCount) {
-                        for (let i = 0, l = separatorsCount; i < l; i++) {
-                            let chunk = data.slice(indexes[i - 1] + 1, indexes[i]);
-                            if (previousData) chunk = previousData + chunk, previousData = '';
-                            parse(chunk);
-                        }
-                        previousData = data.slice(indexes[separatorsCount - 1] + 1);
-                    } else previousData += data;
-                }
-
-            }).on('error', err => {
-                throw err;
-            }).on('close', () => {
-                ipcServer.removeAllListeners();
-                setTimeout(createServer, 1000);
-                throw `ipc server ${id} closed`;
-            }).listen('\\\\?\\pipe\\' + id);
-        }
-        createServer();
+    constructor(serverName: string, config?: serverConfig) {
+        this.#config = config;
+        try { fs.unlinkSync('\\\\?\\pipe\\' + serverName) } catch (err) { }
+        this.#createServer(serverName);
     }
 
-    on(event: string, handler: requestHandler) {
-        this.eventListeners[event] = handler;
+    #createServer(serverName: string) {
+        const ipcServer = net.createServer((socket: net.Socket) => {
+            const parse = async (data: string) => {
+                const stringArray = data.slice(18).split('⚑');
+
+                const handler = this.#eventListeners[stringArray[0]];
+                if (!handler)
+                    return;
+
+                let socketData: any;
+                try {
+                    const body = JSON.parse(stringArray.slice(1)[0]);
+                    const response = await handler(body);
+                    socketData = { i: data.slice(0, 18), e: null, r: response };
+                } catch (err) {
+                    socketData = { i: data.slice(0, 18), e: err, r: null };
+                } finally {
+                    if (socket.writable)
+                        socket.write(JSON.stringify(socketData) + '⚑');
+                }
+            }
+
+            let previousData = '';
+            const parseChunk = (data: string) => {
+                let lastIndex = -2,
+                    indexes = [];
+
+                while (lastIndex !== -1)
+                    lastIndex = data.indexOf('\f', lastIndex !== -2 ? lastIndex + 1 : 0), indexes.push(lastIndex)
+
+                const separatorsCount = indexes.length - 1;
+
+                if (separatorsCount) {
+                    for (let i = 0, l = separatorsCount; i < l; i++) {
+                        let chunk = data.slice(indexes[i - 1] + 1, indexes[i]);
+
+                        if (previousData)
+                            chunk = previousData + chunk, previousData = '';
+
+                        parse(chunk);
+                    }
+                    previousData = data.slice(indexes[separatorsCount - 1] + 1);
+                } else {
+                    previousData += data;
+                }
+            }
+
+            socket
+                .on('data', parseChunk)
+                .on('error', (err) => {
+                    if (this.#config?.onError)
+                        return this.#config.onError(err);
+
+                    throw err;
+                })
+                .on('close', () => {
+                    socket.removeAllListeners();
+                    socket.destroy();
+                })
+                .setEncoding('utf8');
+
+        })
+            .on('error', err => {
+                if (this.#config?.onError)
+                    return this.#config.onError(err);
+
+                throw err;
+            })
+            .on('close', () => {
+                ipcServer.removeAllListeners();
+                setTimeout(() => this.#createServer(serverName), 1000);
+                const err = `ipc server ${serverName} closed`;
+
+                if (this.#config?.onClose)
+                    return this.#config.onClose();
+
+                if (this.#config?.onError)
+                    return this.#config.onError(err);
+
+                throw err;
+            })
+            .listen('\\\\?\\pipe\\' + serverName);
+
+        process.on("exit", () => {
+            try { fs.unlinkSync('\\\\?\\pipe\\' + serverName) } catch (err) { }
+        });
+    }
+
+    on(event: string, handler: RequestHandler) {
+        this.#eventListeners[event] = handler;
         return this;
     }
 }
 
 export class client {
-    private ipcClient: net.Socket;
-    private resMap: {
-        [id: string]: response
-    } = {};
-    private backlogs: [string, (string | number)[], response][] = [];
+    #ipcClient?: net.Socket;
+    #resMap: { [id: string]: PromiseHandler } = {};
+    #backlogs: [string, any, PromiseHandler][] = [];
+    #config?: clientConfig;
+    #connected: boolean = false;
+    #now = Date.now();
 
-    public connected: boolean = false;
+    constructor(serverName: string, config?: clientConfig) {
+        this.#config = config;
+        this.#connect(serverName);
+    }
 
-    constructor(id: string) {
-        const t = Date.now(),
-            connect = () => {
-                if (this.ipcClient) this.ipcClient.destroy();
+    #connect(serverName: string) {
+        if (this.#ipcClient)
+            this.#ipcClient.destroy();
 
-                const exec = (json: { i: string, e: any, r: any }) => {
-                    this.resMap[json.i](json.e, json.r);
-                    delete this.resMap[json.i];
+        const exec = (json: { i: string, e: any, r: any }) => {
+            const callback = this.#resMap[json.i];
+
+            if (json.e)
+                callback.reject(json.e);
+            else
+                callback.resolve(json.r);
+
+            delete this.#resMap[json.i];
+        }
+
+        let previousData = '';
+        const parseChunk = (data: string) => {
+            let lastIndex = -2,
+                indexes = [];
+
+            while (lastIndex !== -1)
+                lastIndex = data.indexOf('⚑', lastIndex !== -2 ? lastIndex + 1 : 0), indexes.push(lastIndex)
+
+            const separatorsCount = indexes.length - 1;
+
+            if (separatorsCount) {
+                for (let i = 0, l = separatorsCount; i < l; i++) {
+                    let chunk = data.slice(indexes[i - 1] + 1, indexes[i]);
+                    if (previousData) chunk = previousData + chunk, previousData = '';
+                    exec(JSON.parse(chunk));
                 }
-                let previousData = '';
+                previousData = data.slice(indexes[separatorsCount - 1] + 1);
+            } else previousData += data;
+        };
 
-                this.ipcClient = net.createConnection('\\\\?\\pipe\\' + id, () => {
-                    this.connected = true;
-                    const l = this.backlogs.length;
-                    if (l) for (let i = l; i--;)
-                        this.send(...this.backlogs.pop());
-                }).on('error', (err) => {
-                    if (Date.now() - t > 2000) throw err;
-                }).on('close', () => {
-                    this.connected = false;
-                    connect();
-                }).on('data', parseChunk)
-                    .setEncoding('utf8');
-
-                function parseChunk(data: string) {
-                    let lastIndex = -2,
-                        indexes = [];
-
-                    while (lastIndex !== -1)
-                        lastIndex = data.indexOf('⚑', lastIndex !== -2 ? lastIndex + 1 : 0), indexes.push(lastIndex)
-
-                    const separatorsCount = indexes.length - 1;
-
-                    if (separatorsCount) {
-                        for (let i = 0, l = separatorsCount; i < l; i++) {
-                            let chunk = data.slice(indexes[i - 1] + 1, indexes[i]);
-                            if (previousData) chunk = previousData + chunk, previousData = '';
-                            exec(JSON.parse(chunk));
-                        }
-                        previousData = data.slice(indexes[separatorsCount - 1] + 1);
-                    } else previousData += data;
+        this.#ipcClient = net.createConnection('\\\\?\\pipe\\' + serverName, () => {
+            this.#connected = true;
+            if (this.#backlogs.length > 0) {
+                for (let i = this.#backlogs.length; i--;) {
+                    const pop = this.#backlogs.pop();
+                    if (pop)
+                        this.#doSend(...pop);
                 }
             }
-        connect();
+        })
+            .on('error', (err) => {
+                if (Date.now() - this.#now <= (this.#config?.timeout ?? 2000))
+                    return;
+
+                if (this.#config?.onError)
+                    return this.#config.onError(err);
+
+                throw err;
+            })
+            .on('close', () => {
+                this.#connected = false;
+                this.#connect(serverName);
+            })
+            .on('data', parseChunk)
+            .setEncoding('utf8');
     }
 
-    send(type: string, req: (string | number)[], res?: response) {
-        if (!this.connected) return this.backlogs.push([type, req, res]);
-        let id: string;
-        if (res) {
-            id = uuid();
-            this.resMap[id] = res;
-        } else id = '⚐';
-        let msg = [type, ...req].join('⚑');
-        if (msg.indexOf('\f') > -1) msg = msg.replace(/\f/g, '\n');
-        this.ipcClient.write(id + msg + '\f');
+    send<T>(type: string, data: any): Promise<T> {
+        const promise = new Promise<T>((resolve, reject) => {
+            if (!this.#connected)
+                return this.#backlogs.push([type, data, { resolve, reject }]);
+
+            this.#doSend(type, data, { resolve, reject });
+        });
+
+        return promise;
     }
+
+    #doSend(type: string, req: any, promise: PromiseHandler) {
+        const id: string = uuid();
+        this.#resMap[id] = promise;
+        const data = JSON.stringify(req);
+        let msg = [type, data].join('⚑');
+        if (msg.indexOf('\f') > -1)
+            msg = msg.replace(/\f/g, '\n');
+
+        this.#ipcClient?.write(`${id}${msg}\f`);
+    }
+
+    public get connected() {
+        return this.#connected;
+    }
+
 }

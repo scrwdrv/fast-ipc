@@ -1,3 +1,9 @@
+# Pipes
+\\?\pipe\*
+
+# Dist
+dist/
+
 # Logs
 logs
 *.log
